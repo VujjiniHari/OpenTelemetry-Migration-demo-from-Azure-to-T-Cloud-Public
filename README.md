@@ -197,8 +197,7 @@ graph TB
 ## Repository Structure
 
 ```
-K8_Migration/
-├── .gitignore                              # Terraform, K8s, Helm, credentials
+OpenTelemetry-Migration-demo-from-Azure-to-T-Cloud-Public/
 ├── README.md                               # You are here
 │
 ├── prereqs-terraform/                      # Phase 0: Shared Pre-requisites
@@ -259,7 +258,7 @@ Before running this demo, ensure you have the following installed and configured
 
 ### Environment Variables Setup
 
-Before executing any scripts or Terraform commands, configure environment variables for both cloud platforms. Create a `.env` file (already in `.gitignore`) and `source` it before each session.
+Before executing any scripts or Terraform commands, configure environment variables for both cloud platforms. Create a local `.env` file (not committed — add it to your own `.gitignore`) and `source` it before each session.
 
 ---
 
