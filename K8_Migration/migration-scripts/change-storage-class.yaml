@@ -1,0 +1,89 @@
+# =============================================================================
+# change-storage-class.yaml — Velero Storage Class Translation ConfigMap
+# =============================================================================
+# THIS IS A CRITICAL MIGRATION EDGE CASE.
+#
+# PROBLEM:
+# When Velero restores PersistentVolumeClaims (PVCs) from Azure to T-Cloud,
+# the PVCs still reference Azure storage classes (e.g., "managed-csi",
+# "managed-premium", "default"). These storage classes don't exist on
+# T-Cloud CCE, so the PVCs would stay in "Pending" state forever because
+# no StorageClass can fulfill them.
+#
+# SOLUTION:
+# Velero supports a ConfigMap-based storage class mapping. During restore,
+# Velero reads this ConfigMap and automatically translates Azure storage
+# class names to their T-Cloud equivalents. This is a seamless, zero-code
+# way to handle cross-cloud storage incompatibilities.
+#
+# HOW IT WORKS:
+# 1. This ConfigMap must be created in the "velero" namespace on the TARGET
+#    cluster BEFORE running the restore
+# 2. The ConfigMap name MUST be "change-storage-class" — Velero looks for
+#    this exact name by convention
+# 3. Each key-value pair maps: <source-storage-class> → <target-storage-class>
+# 4. During restore, Velero intercepts each PVC and rewrites its
+#    spec.storageClassName according to this mapping
+#
+# APPLY THIS ON THE TARGET (CCE) CLUSTER:
+#   kubectl apply -f change-storage-class.yaml
+#
+# T-CLOUD STORAGE CLASSES:
+# - "csi-disk":        Standard EVS (Elastic Volume Service) disk via CSI
+# - "csi-disk-ssd":    SSD-backed EVS disk via CSI (higher IOPS)
+# - "csi-obs":         Object Storage Service (for ReadWriteMany scenarios)
+#
+# AZURE STORAGE CLASSES BEING MAPPED:
+# - "managed-csi":       Azure Managed Disk with CSI driver (default in AKS 1.21+)
+# - "managed-premium":   Azure Premium SSD Managed Disk
+# - "managed":           Azure Standard Managed Disk (legacy)
+# - "default":           Cluster default StorageClass
+# - "azurefile-csi":     Azure Files (SMB) via CSI — maps to csi-disk since
+#                        T-Cloud EVS doesn't have a direct SMB equivalent
+# =============================================================================
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  # IMPORTANT: This name MUST be exactly "change-storage-class".
+  # Velero hardcodes this ConfigMap name in its restore logic.
+  name: change-storage-class
+  # IMPORTANT: Must be in the "velero" namespace where Velero is installed.
+  namespace: velero
+  labels:
+    app.kubernetes.io/name: velero
+    app.kubernetes.io/component: storage-class-mapping
+    purpose: aks-to-cce-migration
+data:
+  # =========================================================================
+  # Storage Class Mappings: Azure → T-Cloud
+  # =========================================================================
+  # Format: <azure-storage-class-name>: <tcloud-storage-class-name>
+  #
+  # All Azure managed disk classes map to T-Cloud's "csi-disk" which uses
+  # Elastic Volume Service (EVS). For workloads that need higher IOPS,
+  # change the target to "csi-disk-ssd".
+  # =========================================================================
+
+  # Azure CSI-based managed disks (default in modern AKS clusters)
+  # → T-Cloud EVS disk via CSI driver
+  managed-csi: csi-disk
+
+  # Azure Premium SSD managed disks (used for latency-sensitive workloads)
+  # → T-Cloud EVS disk (use "csi-disk-ssd" if you need SSD performance)
+  managed-premium: csi-disk
+
+  # Azure Standard managed disks (legacy, pre-CSI)
+  # → T-Cloud EVS disk via CSI driver
+  managed: csi-disk
+
+  # Cluster default StorageClass — maps to T-Cloud's general-purpose disk
+  default: csi-disk
+
+  # Azure Files CSI (SMB file shares) — no direct T-Cloud equivalent,
+  # so we map to EVS disk. If the workload needs ReadWriteMany access,
+  # consider mapping to "csi-obs" (OBS-based storage) instead.
+  azurefile-csi: csi-disk
+
+  # Azure Files (legacy, pre-CSI)
+  azurefile: csi-disk

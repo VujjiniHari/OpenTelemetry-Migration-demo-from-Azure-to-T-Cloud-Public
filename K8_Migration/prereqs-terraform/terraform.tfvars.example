@@ -1,0 +1,19 @@
+# =============================================================================
+# terraform.tfvars.example — Shared Prerequisites Variable Overrides
+# =============================================================================
+# Copy to terraform.tfvars if you need non-default bucket or org names.
+# Run this module FIRST before azure-terraform or tcloud-terraform.
+# =============================================================================
+
+# T-Cloud region
+# region = "eu-de"
+
+# Terraform remote state bucket (must exist before running azure/tcloud modules)
+# tfstate_bucket_name = "otel-migration-tfstate"
+
+# Velero backup bridge bucket
+# obs_bucket_name    = "velero-otel-migration-demo"
+# obs_storage_class  = "STANDARD"
+
+# SWR image namespace
+# swr_organization = "otel-migration-demo"

@@ -1,0 +1,29 @@
+# =============================================================================
+# terraform.tfvars.example — Azure Source Environment Variable Overrides
+# =============================================================================
+# Copy this file to terraform.tfvars and adjust for your deployment.
+# File is committed; terraform.tfvars is in .gitignore (never commit secrets).
+#
+# All variables have working defaults in variables.tf. Only override here
+# if you need to deviate from the demo-standard configuration.
+# =============================================================================
+
+# Azure region (must match your subscription's available regions)
+# location = "westeurope"
+
+# Resource naming
+# resource_group_name = "rg-otel-migration-demo"
+# environment         = "demo"
+
+# Networking
+# vnet_address_space = ["10.0.0.0/16"]
+# aks_subnet_prefix  = "10.0.0.0/20"
+
+# AKS cluster
+# aks_cluster_name   = "aks-otel-source"
+# kubernetes_version = "1.28"
+# aks_node_count     = 3
+# aks_node_vm_size   = "Standard_D4s_v3"   # 4 vCPU / 16 GB — do not go smaller
+
+# Container Registry
+# acr_sku = "Standard"

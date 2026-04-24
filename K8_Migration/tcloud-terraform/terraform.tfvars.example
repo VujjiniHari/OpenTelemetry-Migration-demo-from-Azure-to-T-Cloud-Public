@@ -1,0 +1,34 @@
+# =============================================================================
+# terraform.tfvars.example — T-Cloud Target Environment Variable Overrides
+# =============================================================================
+# Copy this file to terraform.tfvars and adjust for your deployment.
+# File is committed; terraform.tfvars is in .gitignore (never commit secrets).
+#
+# Authentication is handled via OS_* environment variables (see .env.example),
+# NOT via variables here. Do not put credentials in this file.
+# =============================================================================
+
+# T-Cloud region / AZ
+# region            = "eu-de"
+# availability_zone = "eu-de-01"
+
+# Networking (intentionally different from Azure: 10.20.0.0/16 vs 10.0.0.0/16)
+# vpc_name       = "vpc-otel-target"
+# vpc_cidr       = "10.20.0.0/16"
+# subnet_cidr    = "10.20.0.0/18"
+# subnet_gateway = "10.20.0.1"
+
+# CCE cluster
+# cce_cluster_name   = "cce-otel-target"
+# cce_cluster_flavor = "cce.s1.small"    # up to 50 nodes, sufficient for demo
+
+# Node pool — s3.xlarge.4 (4 vCPU / 16 GB) matches Azure Standard_D4s_v3.
+# Do NOT downsize to s3.large.2 (2 vCPU / 4 GB): OTel demo will OOMKill.
+# cce_node_flavor = "s3.xlarge.4"
+# cce_node_count  = 3
+
+# Container registry
+# swr_organization = "otel-migration-demo"
+
+# NAT Gateway outbound bandwidth (Mbps)
+# nat_bandwidth_size = 10

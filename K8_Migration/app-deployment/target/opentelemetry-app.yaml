@@ -1,0 +1,111 @@
+# =============================================================================
+# opentelemetry-app.yaml — ArgoCD Application Manifest (T-Cloud CCE Target)
+# =============================================================================
+# This is the TARGET version of the ArgoCD Application manifest. It differs
+# from the source (Azure) version in two critical ways:
+#
+#   1. IMAGE REGISTRY: Overrides default image references to point to
+#      T-Cloud SWR (swr.eu-de.otc.t-systems.com) instead of the public
+#      ghcr.io registry. This ensures images are pulled from the local
+#      T-Cloud registry (faster, no external dependency).
+#
+#   2. LOAD BALANCER ANNOTATIONS: Uses T-Cloud ELB-specific annotations
+#      instead of Azure LB annotations. These annotations tell CCE's
+#      cloud controller to automatically provision a public Elastic Load
+#      Balancer for the frontend.
+#
+# THESE TWO CHANGES are the essence of "GitOps Repointing" — the same
+# application definition, adapted for a different cloud platform.
+# =============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: opentelemetry-demo
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  # ---------------------------------------------------------------------------
+  # SOURCE: Same Helm chart, different values
+  # ---------------------------------------------------------------------------
+  source:
+    repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+    chart: opentelemetry-demo
+    # IMPORTANT: Same chart version as the source to ensure feature parity
+    targetRevision: "0.32.8"
+
+    helm:
+      values: |
+        # =====================================================================
+        # OTEL Resource Attributes (identical to source)
+        # =====================================================================
+        default:
+          envOverrides:
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.name=$(OTEL_SERVICE_NAME),k8s.namespace.name=$(POD_NAMESPACE),k8s.pod.name=$(POD_NAME)"
+
+        # =====================================================================
+        # IMAGE REGISTRY OVERRIDE — Point to T-Cloud SWR
+        # =====================================================================
+        # This is the KEY CHANGE for the migration. By overriding the default
+        # image repository, all microservice images will be pulled from the
+        # T-Cloud SWR registry instead of the public ghcr.io.
+        #
+        # WHY: 
+        # - Eliminates dependency on external registries
+        # - Faster image pulls (SWR is in the same region as CCE)
+        # - Demonstrates the complete image migration workflow
+        #
+        # NOTE: The images must have been synced to SWR first using the
+        # sync-images-to-swr.sh script. The SWR organization must match.
+        # =====================================================================
+        default:
+          image:
+            repository: swr.eu-de.otc.t-systems.com/otel-migration-demo/demo
+          envOverrides:
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.name=$(OTEL_SERVICE_NAME),k8s.namespace.name=$(POD_NAMESPACE),k8s.pod.name=$(POD_NAME)"
+
+        # =====================================================================
+        # Frontend Proxy — T-Cloud ELB Configuration
+        # =====================================================================
+        # CRITICAL DIFFERENCE FROM AZURE:
+        # Azure uses: service.beta.kubernetes.io/azure-load-balancer-*
+        # T-Cloud uses: kubernetes.io/elb.class + kubernetes.io/elb.autocreate
+        #
+        # The ELB autocreate annotation is a JSON string that tells CCE's
+        # cloud controller how to provision the load balancer:
+        #   - type: "public"           → Internet-facing (vs. "inner")
+        #   - bandwidth_name:          → Human-readable label
+        #   - bandwidth_chargemode:    → "traffic" = pay per GB
+        #   - bandwidth_size: 5        → 5 Mbps dedicated bandwidth
+        #   - bandwidth_sharetype:     → "PER" = dedicated (not shared)
+        #   - eip_type: "5_bgp"        → Dynamic BGP IP (most reliable)
+        # =====================================================================
+        components:
+          frontendProxy:
+            service:
+              type: LoadBalancer
+              annotations:
+                kubernetes.io/elb.class: "union"
+                kubernetes.io/elb.autocreate: '{"type":"public","bandwidth_name":"otel-bandwidth","bandwidth_chargemode":"traffic","bandwidth_size":5,"bandwidth_sharetype":"PER","eip_type":"5_bgp"}'
+
+  # ---------------------------------------------------------------------------
+  # DESTINATION: Deploy to the local CCE cluster
+  # ---------------------------------------------------------------------------
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: opentelemetry
+
+  # ---------------------------------------------------------------------------
+  # SYNC POLICY: Same automated GitOps behavior as the source
+  # ---------------------------------------------------------------------------
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

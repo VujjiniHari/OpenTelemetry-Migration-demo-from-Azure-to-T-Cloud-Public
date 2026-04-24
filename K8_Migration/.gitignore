@@ -1,0 +1,105 @@
+# =============================================================================
+# .gitignore — OpenTelemetry AKS-to-CCE Migration Demo
+# =============================================================================
+# This file prevents sensitive, generated, and environment-specific files from
+# being committed to the repository. It covers Terraform, Kubernetes, Helm,
+# Velero, and general OS/editor artifacts.
+# =============================================================================
+
+# ---------------------
+# Terraform
+# ---------------------
+# Local .terraform directories contain provider plugins and modules downloaded
+# during `terraform init`. These are machine-specific and should never be committed.
+.terraform/
+
+# Terraform state files contain the full state of your infrastructure, including
+# sensitive values like passwords and private keys. NEVER commit these.
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# Lock files pin provider versions. While committing this is sometimes recommended
+# for reproducibility, we exclude it here because this demo spans multiple
+# Terraform roots (azure-terraform/, tcloud-terraform/) with different providers.
+.terraform.lock.hcl
+
+# Terraform plan output files (binary)
+*.tfplan
+
+# Terraform variable override files — often contain secrets for local development
+*.auto.tfvars
+*.auto.tfvars.json
+terraform.tfvars
+terraform.tfvars.json
+# Allow committed example files (no secrets, just structure guidance)
+!terraform.tfvars.example
+
+# Crash log files generated when Terraform crashes
+crash.log
+crash.*.log
+
+# ---------------------
+# Kubernetes & Helm
+# ---------------------
+# Kubeconfig files contain cluster credentials — extremely sensitive
+kubeconfig*
+*.kubeconfig
+kubeconfig.json
+
+# Helm chart dependencies (downloaded tarballs)
+charts/*.tgz
+
+# ---------------------
+# Velero
+# ---------------------
+# Velero credential files contain cloud provider access keys
+obs.credentials
+velero-credentials
+*.credentials
+
+# Velero environment files may contain S3 endpoints and bucket info
+obs.env
+
+# ---------------------
+# Cloud CLI Credentials
+# ---------------------
+.azure/
+*-openrc.sh
+clouds.yaml
+secure.yaml
+.aws/
+
+# ---------------------
+# SSH Keys
+# ---------------------
+*.pem
+*.key
+id_rsa
+id_ed25519
+
+# ---------------------
+# OS & Editor Files
+# ---------------------
+.DS_Store
+*~
+.nfs*
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ---------------------
+# Logs & Temp Files
+# ---------------------
+*.log
+tmp/
+temp/
+
+# ---------------------
+# Environment Files
+# ---------------------
+.env
+.env.*
+!.env.example

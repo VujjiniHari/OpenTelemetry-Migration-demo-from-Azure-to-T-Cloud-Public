@@ -1,0 +1,101 @@
+# =============================================================================
+# opentelemetry-app.yaml — ArgoCD Application Manifest (Azure AKS Source)
+# =============================================================================
+# This ArgoCD Application manifest instructs ArgoCD to deploy the OpenTelemetry
+# Astronomy Shop demo onto the AKS cluster using the official Helm chart.
+#
+# HOW IT WORKS:
+# 1. ArgoCD reads this manifest and registers it as a managed Application
+# 2. It pulls the OpenTelemetry Helm chart from the public Helm repository
+# 3. It renders the chart with our custom values (see helm.values below)
+# 4. It applies the rendered manifests to the AKS cluster
+# 5. The automated sync policy ensures ArgoCD continuously reconciles the
+#    desired state (this manifest) with the actual cluster state
+#
+# KEY CUSTOMIZATION:
+# - The frontendProxy service is set to type: LoadBalancer with Azure-specific
+#   annotations to provision an Azure Standard Load Balancer with a public IP.
+#   This is how the demo audience will access the Astronomy Shop UI.
+# =============================================================================
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: opentelemetry-demo
+  # ArgoCD watches this namespace for Application CRDs
+  namespace: argocd
+
+  # The finalizer ensures that when this Application is deleted, ArgoCD will
+  # also delete all the Kubernetes resources it created (the OTel microservices).
+  # Without this, deleting the Application would orphan the deployed resources.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+
+spec:
+  # "default" is ArgoCD's built-in project. For a demo this is sufficient.
+  # In production, you'd create a dedicated project with RBAC restrictions.
+  project: default
+
+  # ---------------------------------------------------------------------------
+  # SOURCE: Where to get the application definition
+  # ---------------------------------------------------------------------------
+  source:
+    # The official OpenTelemetry Helm chart repository
+    repoURL: https://open-telemetry.github.io/opentelemetry-helm-charts
+    chart: opentelemetry-demo
+    # Pin to a specific chart version for reproducibility.
+    # Check https://github.com/open-telemetry/opentelemetry-helm-charts/releases
+    targetRevision: "0.32.8"
+
+    helm:
+      # Custom Helm values that override the chart's defaults.
+      # These are applied ON TOP of the chart's values.yaml.
+      values: |
+        # =====================================================================
+        # OTEL Resource Attributes
+        # =====================================================================
+        # Inject Kubernetes metadata into OpenTelemetry resource attributes.
+        # This enriches telemetry data with pod/namespace info, making traces
+        # and metrics more useful for debugging during the migration.
+        default:
+          envOverrides:
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.name=$(OTEL_SERVICE_NAME),k8s.namespace.name=$(POD_NAMESPACE),k8s.pod.name=$(POD_NAME)"
+
+        # =====================================================================
+        # Frontend Proxy — Azure Load Balancer Configuration
+        # =====================================================================
+        # Expose the frontend via an Azure Standard Load Balancer.
+        # This creates a public IP that the demo audience uses to access
+        # the Astronomy Shop UI. The health probe annotation is required by
+        # Azure to properly check the backend health of the proxy pod.
+        components:
+          frontendProxy:
+            service:
+              type: LoadBalancer
+              annotations:
+                # Azure-specific: Configure health probe path for the Standard LB
+                service.beta.kubernetes.io/azure-load-balancer-health-probe-request-path: "/"
+
+  # ---------------------------------------------------------------------------
+  # DESTINATION: Where to deploy the application
+  # ---------------------------------------------------------------------------
+  destination:
+    # Deploy to the same cluster where ArgoCD is running
+    server: https://kubernetes.default.svc
+    # Deploy into a dedicated namespace to keep OTel resources organized
+    namespace: opentelemetry
+
+  # ---------------------------------------------------------------------------
+  # SYNC POLICY: How ArgoCD manages the application lifecycle
+  # ---------------------------------------------------------------------------
+  syncPolicy:
+    automated:
+      # prune: Automatically delete K8s resources no longer defined in the chart
+      prune: true
+      # selfHeal: Auto-revert manual changes (kubectl edit) back to desired state
+      selfHeal: true
+
+    syncOptions:
+      # Automatically create the "opentelemetry" namespace if it doesn't exist
+      - CreateNamespace=true
